@@ -41,12 +41,13 @@ def _generate_single(
     if reference_images:
         for ref_img in reference_images:
             contents.append(ref_img)
-        # Explicit instruction so Gemini knows what the reference images are
+        # Tell Gemini what the reference images are
         contents.append(
             "The first attached image is the REAL ApotekHunden product jar. "
-            "You MUST reproduce this exact jar — its shape, white container, "
-            "forest green label, logo, and all text — faithfully in the generated image. "
-            "Do NOT invent a different jar design.\n\n"
+            "IF a product jar or packaging appears in the generated image, it MUST "
+            "be this exact jar — same shape, white container, forest green label, "
+            "logo, and text. Do NOT invent a different jar design. "
+            "ALL text in the image MUST be in Swedish — no English.\n\n"
         )
     contents.append(prompt)
 
@@ -84,7 +85,7 @@ async def run_generator(
     resolution: str = DEFAULT_RESOLUTION,
     reference_image_paths: list[str] | None = None,
 ) -> list[GeneratedImage]:
-    """Generate 5 images sequentially with progress events."""
+    """Generate images sequentially with progress events."""
 
     job_dir = OUTPUTS_DIR / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
@@ -108,9 +109,9 @@ async def run_generator(
             job_id=job_id,
             data={
                 "agent": "generator",
-                "message": f"Generating image {i + 1}/5: {variant.label}",
+                "message": f"Generating image {i + 1}/{len(prompts)}: {variant.label}",
                 "current": i + 1,
-                "total": 5,
+                "total": len(prompts),
             },
         ))
 

@@ -488,7 +488,7 @@
       alert("Nätverksfel: " + err.message);
     } finally {
       $submitBtn.disabled = false;
-      $submitBtn.textContent = "Generera 5 varianter";
+      $submitBtn.textContent = "Generera 6 varianter";
     }
   });
 

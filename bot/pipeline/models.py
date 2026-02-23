@@ -29,6 +29,7 @@ class VariantType(str, Enum):
     ALT_COMPOSITION = "v3-alt-composition"
     STYLE_VARIATION = "v4-style-variation"
     BOLD_CREATIVE = "v5-bold-creative"
+    REFERENCE_COPY = "v6-reference-copy"
 
 
 # ── Pipeline Request ───────────────────────────────────────────────

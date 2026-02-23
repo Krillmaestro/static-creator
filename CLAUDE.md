@@ -45,12 +45,13 @@ This project uses the **PaperBanana agentic framework** to generate professional
 2. **Resolution values MUST use uppercase K** — `"2K"` not `"2k"`
 3. **Prompts must be narrative paragraphs** — never keyword lists
 4. **Save all outputs to `outputs/`** with descriptive filenames
-5. **Always generate 5 variants** per request:
+5. **Always generate 6 variants** per request:
    - v1: Faithful (closest to user's request)
    - v2: Enhanced (elevated production quality)
    - v3: Alternative Composition (different angle/layout)
    - v4: Style Variation (different artistic treatment)
    - v5: Bold/Creative (experimental push)
+   - v6: Reference Copy (near-identical to reference image, but with ApotekHunden colors & Swedish text)
 6. **The Lead coordinates only** — never generates images itself
 7. **Research Agent** only analyzes images the Lead specifies — does NOT scan broadly unless told to
 8. **Generator Agent** retries up to 2 times on API failures

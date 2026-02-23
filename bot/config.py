@@ -83,5 +83,6 @@ VARIANT_LABELS: list[str] = [
     "v3-alt-composition",
     "v4-style-variation",
     "v5-bold-creative",
+    "v6-reference-copy",
 ]
-NUM_VARIANTS: int = 5
+NUM_VARIANTS: int = 6
