@@ -131,7 +131,7 @@ async def get_job(job_id: str) -> JSONResponse:
 @router.post("/generate")
 async def generate(
     prompt: str = Form(...),
-    aspect_ratio: str = Form("4:3"),
+    aspect_ratio: str = Form("1:1"),
     resolution: str = Form("2K"),
     files: list[UploadFile] = File(default=[]),
 ) -> JSONResponse:

@@ -3,7 +3,8 @@ __pycache__/
 *.pyc
 .DS_Store
 outputs/
-reference-images/
+reference-images/*
+!reference-images/product-jar.png
 diagrams/
 diagrams.zip
 *.docx

@@ -36,7 +36,7 @@ REFERENCE_DIR.mkdir(exist_ok=True)
 
 # ── Gemini defaults ────────────────────────────────────────────────
 GEMINI_MODEL: str = "gemini-3-pro-image-preview"
-DEFAULT_ASPECT_RATIO: str = "4:3"
+DEFAULT_ASPECT_RATIO: str = "1:1"
 DEFAULT_RESOLUTION: str = "2K"  # MUST be uppercase K
 MAX_RETRIES: int = 2
 
