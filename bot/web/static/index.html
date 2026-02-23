@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banana Squad — Dashboard</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+</head>
+<body>
+
+  <header>
+    <h1>🐾 Banana Squad</h1>
+    <div class="status-label">
+      <span id="status-dot" class="status-dot disconnected"></span>
+      <span id="status-text">Ansluter...</span>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+
+      <!-- Pipeline Progress -->
+      <div class="card">
+        <div class="card-header">📊 Pipeline</div>
+        <div class="card-body">
+          <div id="pipeline-stages" class="pipeline-stages">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent Log -->
+      <div class="card">
+        <div class="card-header">💬 Agent-logg</div>
+        <div class="card-body">
+          <div id="agent-log" class="agent-log">
+            <div class="empty-state">
+              <p>Väntar på aktivitet...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Job History -->
+      <div class="card">
+        <div class="card-header">📋 Jobbhistorik</div>
+        <div class="card-body">
+          <div id="job-list" class="job-list">
+            <div class="empty-state">
+              <div class="emoji">📋</div>
+              <p>Inga jobb ännu. Skicka en beskrivning via Telegram!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+
+      <!-- Current Job Header -->
+      <div class="card">
+        <div class="card-header">🎨 Genererade bilder</div>
+        <div class="card-body">
+          <h2 id="job-title" style="font-family: 'DM Serif Display', serif; font-size: 1.2rem; margin-bottom: 1rem; color: var(--forest);">
+            Väntar på nytt jobb...
+          </h2>
+          <div id="image-grid" class="image-grid">
+            <div class="empty-state">
+              <div class="emoji">🎨</div>
+              <p>Bilder visas här när de genereras...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

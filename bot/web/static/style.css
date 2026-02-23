@@ -1,0 +1,329 @@
+/* Banana Squad Dashboard — ApotekHunden Brand */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');
+
+:root {
+  --forest: #2C5530;
+  --main-green: #30574c;
+  --cream: #FAF7F2;
+  --bark: #3D2E1E;
+  --amber: #C8924A;
+  --soft-green: #EFF5EF;
+  --white: #ffffff;
+  --gray-100: #f5f5f5;
+  --gray-200: #e5e5e5;
+  --gray-400: #a3a3a3;
+  --gray-600: #525252;
+  --red: #dc2626;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--bark);
+  min-height: 100vh;
+}
+
+/* ── Header ─────────────────────────────────────── */
+
+header {
+  background: var(--forest);
+  color: var(--cream);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+header h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+header .status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.5rem;
+}
+
+header .status-dot.connected { background: #4ade80; }
+header .status-dot.disconnected { background: var(--red); }
+
+.status-label {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ── Layout ─────────────────────────────────────── */
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 1.5rem;
+  min-height: calc(100vh - 60px);
+}
+
+@media (max-width: 900px) {
+  .container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Cards ──────────────────────────────────────── */
+
+.card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 0.85rem 1.2rem;
+  background: var(--soft-green);
+  border-bottom: 1px solid var(--gray-200);
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-body {
+  padding: 1.2rem;
+}
+
+/* ── Sidebar (Agent Log + Pipeline) ─────────────── */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Pipeline progress */
+.pipeline-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 0.88rem;
+}
+
+.stage-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.stage-icon.pending { background: var(--gray-200); }
+.stage-icon.active { background: var(--amber); color: var(--white); animation: pulse 1.5s infinite; }
+.stage-icon.done { background: var(--forest); color: var(--white); }
+.stage-icon.failed { background: var(--red); color: var(--white); }
+
+.stage-label { flex: 1; }
+.stage-label.active { font-weight: 600; color: var(--forest); }
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Agent chat log */
+.agent-log {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.log-entry {
+  display: flex;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.log-agent {
+  font-weight: 600;
+  color: var(--forest);
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.log-time {
+  color: var(--gray-400);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* ── Main content (Images + Scores) ─────────────── */
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Image grid */
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.image-card {
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--white);
+  box-shadow: var(--shadow);
+  transition: transform 0.2s;
+}
+
+.image-card:hover { transform: translateY(-2px); }
+
+.image-card img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+}
+
+.image-card .image-info {
+  padding: 0.75rem;
+}
+
+.image-card .variant-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--forest);
+}
+
+.image-card .variant-score {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  margin-top: 0.2rem;
+}
+
+.image-card .rank-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 0.3rem;
+}
+
+.rank-badge.rank-1 { background: #fef3c7; color: #92400e; }
+.rank-badge.rank-2 { background: var(--gray-200); color: var(--gray-600); }
+.rank-badge.rank-3 { background: #fed7aa; color: #9a3412; }
+
+/* Score bars */
+.score-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+}
+
+.score-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--forest);
+  transition: width 0.6s ease;
+}
+
+/* ── Job history ────────────────────────────────── */
+
+.job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.job-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 0.85rem;
+}
+
+.job-item:hover { background: var(--soft-green); }
+.job-item.active { background: var(--soft-green); border-left: 3px solid var(--forest); }
+
+.job-item .job-prompt {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-item .job-status {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+}
+
+.job-status.complete { background: #dcfce7; color: #166534; }
+.job-status.failed { background: #fee2e2; color: #991b1b; }
+.job-status.running { background: #fef3c7; color: #92400e; }
+
+/* ── Empty states ───────────────────────────────── */
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--gray-400);
+}
+
+.empty-state .emoji { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.empty-state p { font-size: 0.9rem; }
+
+/* ── Scrollbar ──────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }

@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.DS_Store
+outputs/
+reference-images/
+diagrams/
+diagrams.zip
+*.docx
+*.pdf
+.claude/
