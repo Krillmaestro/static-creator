@@ -40,16 +40,21 @@ the Gemini 3 Pro Image API. You create prompts for SOCIAL MEDIA AD STATICS
 7. When the user provides a reference image, describe the layout and style
    elements from that reference and incorporate them
 
-## Product Jar Rule
-The product jar does NOT need to appear in every variant. But IF a product jar
-appears in a prompt, you MUST include this instruction in that prompt:
+## Product Jar Rule — IMPORTANT
+The product jar does NOT need to appear in every variant — in fact, MOST variants
+should NOT include the jar unless the user specifically asks for it or the ad concept
+requires showing the product. Only include a jar when it makes sense for the
+composition. If you DO include a jar, add this instruction in that prompt:
 "Use the exact ApotekHunden product jar from the attached reference photo —
 reproduce its shape, white container, forest green label, logo, and text faithfully."
 
 ## v6 — Reference Copy (MANDATORY)
 v6 ALWAYS recreates the user's reference image (or the ad they described) nearly
 identically — same layout, same composition, same angles — but re-branded with
-ApotekHunden's colors, Swedish text, and (if a jar is visible) the real product jar.
+ApotekHunden's colors, Swedish text, and (if a jar is visible in the reference)
+the real product jar. Only include a jar in v6 if the reference image shows one.
+The v6 prompt MUST describe the reference image's layout in precise spatial detail
+(positions, sizes, arrangements) so that Gemini can replicate it accurately.
 """
 
 ARCHITECT_PROMPT = """\
@@ -65,6 +70,8 @@ with headline, benefits, and CTA. ALL TEXT IN SWEDISH — no English anywhere.
 
 ## Variant Definitions
 {variant_defs}
+
+{learning_context}
 
 ## Example of a Good Prompt (for reference only — do NOT copy)
 "Create a professional social media ad static for a Swedish dog supplement brand. \
@@ -102,9 +109,32 @@ Return ONLY the JSON array, no other text.
 """
 
 
+def build_learning_context(top_prompts: list[dict], limit: int = 5) -> str:
+    """Format top-performing prompts as learning context for the architect."""
+    if not top_prompts:
+        return "Ingen historisk feedback ännu — lita på din expertis."
+
+    examples = top_prompts[:limit]
+    lines = ["## Framgångsrika exempel\n",
+             "Dessa prompter har fått positiv feedback från användaren. "
+             "Lär av deras stil, struktur och tillvägagångssätt:\n"]
+
+    for i, ex in enumerate(examples, 1):
+        selected_tag = " [VALD AV ANVÄNDAREN]" if ex.get("selected") else ""
+        lines.append(f"### Exempel {i}{selected_tag}")
+        lines.append(f"**Användarens prompt:** {ex.get('user_prompt', 'N/A')}")
+        lines.append(f"**Variant:** {ex.get('variant', 'N/A')}")
+        if ex.get("prompt_text"):
+            lines.append(f"**Framgångsrik bildprompt:** {ex['prompt_text'][:500]}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 async def run_prompt_architect(
     user_prompt: str,
     research: ResearchResult | None,
+    learning_context: str = "",
 ) -> list[PromptVariant]:
     """Craft 6 narrative prompts using Claude."""
 
@@ -123,6 +153,9 @@ async def run_prompt_architect(
         for vtype, desc in VARIANT_INSTRUCTIONS.items()
     )
 
+    if not learning_context:
+        learning_context = "Ingen historisk feedback ännu — lita på din expertis."
+
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
     response = await client.messages.create(
@@ -135,6 +168,7 @@ async def run_prompt_architect(
                 user_prompt=user_prompt,
                 research_context=research_context,
                 variant_defs=variant_defs,
+                learning_context=learning_context,
             ),
         }],
     )

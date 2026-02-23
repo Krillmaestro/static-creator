@@ -100,6 +100,13 @@ async def get_job(job_id: str) -> JSONResponse:
             for ev in job.evaluation.evaluations
         ]
 
+    # Build feedback map: variant → {rating, selected}
+    feedback_rows = job_store.get_feedback(job_id)
+    feedback = {
+        fb["variant"]: {"rating": fb["rating"], "selected": fb["selected"]}
+        for fb in feedback_rows
+    }
+
     return JSONResponse({
         "job_id": job.job_id,
         "prompt": job.request.user_prompt,
@@ -137,7 +144,32 @@ async def get_job(job_id: str) -> JSONResponse:
         "summary": job.evaluation.summary if job.evaluation else None,
         "winner": job.evaluation.winner.value if job.evaluation and job.evaluation.winner else None,
         "error": job.error,
+        "feedback": feedback,
     })
+
+
+@router.post("/jobs/{job_id}/feedback")
+async def submit_feedback(
+    job_id: str,
+    variant: str = Form(...),
+    rating: int = Form(0),
+    selected: bool = Form(False),
+) -> JSONResponse:
+    """Save feedback (thumbs up/down, selection) for a variant."""
+    job = job_store.get(job_id)
+    if not job:
+        return JSONResponse({"error": "Job not found"}, status_code=404)
+
+    if rating not in (-1, 0, 1):
+        return JSONResponse({"error": "Rating must be -1, 0, or 1"}, status_code=400)
+
+    # Validate variant exists in this job
+    valid_variants = {img.variant_type.value for img in job.images}
+    if variant not in valid_variants:
+        return JSONResponse({"error": "Invalid variant for this job"}, status_code=400)
+
+    job_store.save_feedback(job_id, variant, rating, selected)
+    return JSONResponse({"status": "ok"})
 
 
 @router.post("/generate")

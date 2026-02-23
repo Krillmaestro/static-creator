@@ -93,12 +93,16 @@ VARIANT_INSTRUCTIONS = {
         "bold creative concept that would stop someone from scrolling. All text in Swedish."
     ),
     "v6-reference-copy": (
-        "IMPORTANT: This variant is a near-identical copy of the user's reference image "
-        "(or the competitor ad they described). Reproduce the EXACT same layout, composition, "
-        "angles, element placement, and visual style — but replace all branding with "
-        "ApotekHunden's brand identity: use the ApotekHunden color palette (forest green "
-        "#2C5530, cream #FAF7F2, amber #C8924A), replace all text with Swedish equivalents, "
-        "and if a product jar is visible, use the exact ApotekHunden jar from the reference photo. "
-        "The goal is: same image, but ApotekHunden's brand and Swedish language."
+        "CRITICAL: This variant is a near-identical COPY of the user's reference ad image. "
+        "Your prompt must describe the EXACT layout, composition, angles, element placement, "
+        "spacing, visual hierarchy, and style of the reference image in precise detail. "
+        "Describe every element's position (top-left, center, bottom-third, etc.), the "
+        "background scene, text placement, badge arrangement, and overall structure. "
+        "The ONLY changes are: (1) replace all branding with ApotekHunden's palette "
+        "(forest green #2C5530, cream #FAF7F2, amber #C8924A), (2) translate all text "
+        "to Swedish equivalents, (3) if and ONLY if the reference shows a product jar, "
+        "use the ApotekHunden jar. Do NOT add a product jar if the reference doesn't have one. "
+        "The goal: someone comparing the reference and v6 side-by-side should see the same "
+        "image structure, just re-branded for ApotekHunden with Swedish text."
     ),
 }

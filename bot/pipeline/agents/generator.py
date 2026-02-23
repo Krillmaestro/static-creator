@@ -28,12 +28,57 @@ def _make_client() -> genai.Client:
     return genai.Client(api_key=GEMINI_API_KEY)
 
 
+def _build_reference_instruction(variant_type: str, num_ref_images: int) -> str:
+    """Build variant-aware instructions for how Gemini should use attached reference images."""
+
+    if variant_type == "v6-reference-copy":
+        # v6: the ad reference is the priority — copy it near-identically
+        if num_ref_images > 1:
+            return (
+                "IMPORTANT CONTEXT FOR ATTACHED IMAGES:\n"
+                "- The FIRST attached image is the ApotekHunden product jar (for reference only — "
+                "include it ONLY if the reference ad also shows a product jar).\n"
+                "- The SECOND attached image (and any after it) is the REFERENCE AD that you MUST "
+                "replicate as closely as possible. Copy its EXACT layout, composition, element "
+                "placement, angles, spacing, and visual hierarchy. Reproduce it nearly identically "
+                "but replace all branding with ApotekHunden (forest green #2C5530, cream #FAF7F2, "
+                "amber #C8924A) and translate all text to Swedish.\n"
+                "ALL text in the image MUST be in Swedish — no English.\n\n"
+            )
+        else:
+            return (
+                "IMPORTANT: The attached image is the ApotekHunden product jar for reference. "
+                "Only include the jar if your prompt calls for it. "
+                "ALL text in the image MUST be in Swedish — no English.\n\n"
+            )
+    else:
+        # v1-v5: product jar is purely optional reference material
+        if num_ref_images > 1:
+            return (
+                "CONTEXT FOR ATTACHED IMAGES:\n"
+                "- The FIRST attached image shows the ApotekHunden product jar. This is reference "
+                "material ONLY — do NOT place the jar in the image unless the prompt below "
+                "explicitly describes a product jar in the scene.\n"
+                "- The remaining attached image(s) are style/mood references for inspiration. "
+                "Draw on their visual style but create an original composition as described in the prompt.\n"
+                "ALL text in the image MUST be in Swedish — no English.\n\n"
+            )
+        else:
+            return (
+                "The attached image shows the ApotekHunden product jar for reference ONLY. "
+                "Do NOT place the jar in the image unless the prompt below explicitly describes "
+                "a product jar in the scene. "
+                "ALL text in the image MUST be in Swedish — no English.\n\n"
+            )
+
+
 def _generate_single(
     client: genai.Client,
     prompt: str,
     aspect_ratio: str,
     resolution: str,
     reference_images: list[Image.Image] | None = None,
+    variant_type: str = "",
 ) -> tuple[Image.Image | None, str]:
     """Synchronous Gemini call — will be wrapped in asyncio.to_thread."""
 
@@ -41,13 +86,8 @@ def _generate_single(
     if reference_images:
         for ref_img in reference_images:
             contents.append(ref_img)
-        # Tell Gemini what the reference images are
         contents.append(
-            "The first attached image is the REAL ApotekHunden product jar. "
-            "IF a product jar or packaging appears in the generated image, it MUST "
-            "be this exact jar — same shape, white container, forest green label, "
-            "logo, and text. Do NOT invent a different jar design. "
-            "ALL text in the image MUST be in Swedish — no English.\n\n"
+            _build_reference_instruction(variant_type, len(reference_images))
         )
     contents.append(prompt)
 
@@ -127,6 +167,7 @@ async def run_generator(
                     aspect_ratio,
                     resolution,
                     ref_images,
+                    variant.variant_type.value,
                 )
 
                 if image is None:

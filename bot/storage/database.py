@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -54,6 +56,17 @@ class SqliteJobStore:
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_jobs_stage
             ON jobs (stage)
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS image_feedback (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id      TEXT NOT NULL,
+                variant     TEXT NOT NULL,
+                rating      INTEGER NOT NULL DEFAULT 0,
+                selected    INTEGER NOT NULL DEFAULT 0,
+                created_at  TEXT NOT NULL,
+                UNIQUE(job_id, variant)
+            )
         """)
         conn.commit()
 
@@ -127,3 +140,77 @@ class SqliteJobStore:
             (f"%{query}%",),
         ).fetchall()
         return [self._deserialize(r["data"]) for r in rows]
+
+    # ── Feedback ───────────────────────────────────────────
+
+    def save_feedback(
+        self,
+        job_id: str,
+        variant: str,
+        rating: int = 0,
+        selected: bool = False,
+    ) -> None:
+        """UPSERT feedback for a variant. If selected=True, deselect others in same job."""
+        conn = self._conn
+        if selected:
+            conn.execute(
+                "UPDATE image_feedback SET selected = 0 WHERE job_id = ?",
+                (job_id,),
+            )
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            """INSERT INTO image_feedback (job_id, variant, rating, selected, created_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(job_id, variant) DO UPDATE SET
+                   rating = excluded.rating,
+                   selected = excluded.selected,
+                   created_at = excluded.created_at""",
+            (job_id, variant, rating, 1 if selected else 0, now),
+        )
+        conn.commit()
+
+    def get_feedback(self, job_id: str) -> list[dict]:
+        """Return all feedback rows for a job."""
+        rows = self._conn.execute(
+            "SELECT variant, rating, selected FROM image_feedback WHERE job_id = ?",
+            (job_id,),
+        ).fetchall()
+        return [
+            {"variant": r["variant"], "rating": r["rating"], "selected": bool(r["selected"])}
+            for r in rows
+        ]
+
+    def get_top_performing_prompts(self, limit: int = 10) -> list[dict]:
+        """Get prompts from jobs with positive feedback or selected variants."""
+        rows = self._conn.execute(
+            """SELECT f.job_id, f.variant, f.rating, f.selected,
+                      j.data, j.prompt AS user_prompt
+               FROM image_feedback f
+               JOIN jobs j ON j.job_id = f.job_id
+               WHERE f.rating > 0 OR f.selected = 1
+               ORDER BY f.selected DESC, f.rating DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+
+        results = []
+        for r in rows:
+            prompt_text = ""
+            try:
+                data = json.loads(r["data"])
+                for p in data.get("prompts", []):
+                    if p.get("variant_type") == r["variant"]:
+                        prompt_text = p.get("narrative_prompt", "")
+                        break
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+            results.append({
+                "job_id": r["job_id"],
+                "variant": r["variant"],
+                "prompt_text": prompt_text,
+                "user_prompt": r["user_prompt"],
+                "rating": r["rating"],
+                "selected": bool(r["selected"]),
+            })
+        return results

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from bot.pipeline.agents.critic import run_critic
 from bot.pipeline.agents.generator import run_generator
-from bot.pipeline.agents.prompt_architect import run_prompt_architect
+from bot.pipeline.agents.prompt_architect import build_learning_context, run_prompt_architect
 from bot.pipeline.agents.research import run_research
 from bot.pipeline.events import Event, EventType, event_bus
 from bot.pipeline.models import PipelineRequest, PipelineResult, PipelineStage
@@ -74,12 +74,16 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResult:
         await event_bus.emit(Event(
             type=EventType.AGENT_MESSAGE,
             job_id=request.job_id,
-            data={"agent": "prompt_architect", "message": "Crafting 5 narrative prompts..."},
+            data={"agent": "prompt_architect", "message": "Crafting 6 narrative prompts..."},
         ))
+
+        top_prompts = job_store.get_top_performing_prompts(limit=10)
+        learning_ctx = build_learning_context(top_prompts, limit=5)
 
         prompts = await run_prompt_architect(
             user_prompt=request.user_prompt,
             research=research,
+            learning_context=learning_ctx,
         )
         result.prompts = prompts
         job_store.update_result(result)

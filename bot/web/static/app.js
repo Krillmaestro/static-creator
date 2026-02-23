@@ -12,6 +12,8 @@
   let agentLog = [];
   let uploadedFiles = [];        // Files from the form
   let searchDebounce = null;
+  let generationProgress = { current: 0, total: 6 };
+  let activityTimer = null;
 
   // ── DOM refs ───────────────────────────────────────────
   const $statusDot = document.getElementById("status-dot");
@@ -23,6 +25,8 @@
   const $gallery = document.getElementById("job-gallery");
   const $searchInput = document.getElementById("search-input");
   const $sortSelect = document.getElementById("sort-select");
+  const $activityBanner = document.getElementById("activity-banner");
+  const $activityText = document.getElementById("activity-text");
 
   // Form refs
   const $form = document.getElementById("generate-form");
@@ -65,6 +69,32 @@
 
   // ── Event handler ──────────────────────────────────────
 
+  // ── Activity Banner ────────────────────────────────────
+
+  function showActivity(text, isError, autoDismissMs) {
+    if (activityTimer) clearTimeout(activityTimer);
+    $activityBanner.style.display = "";
+    $activityBanner.className = "activity-banner" + (isError ? " banner-error" : "");
+    $activityText.textContent = text;
+    if (autoDismissMs) {
+      activityTimer = setTimeout(() => {
+        $activityBanner.style.display = "none";
+      }, autoDismissMs);
+    }
+  }
+
+  function hideActivity() {
+    if (activityTimer) clearTimeout(activityTimer);
+    $activityBanner.style.display = "none";
+  }
+
+  const STAGE_LABELS = {
+    research: "Analyserar referensbilder...",
+    prompt_crafting: "Designar 6 promptvarianter...",
+    generating: "Genererar bilder...",
+    evaluating: "Utvärderar och rankar varianter...",
+  };
+
   function handleEvent(event) {
     const { type, job_id, data, timestamp } = event;
 
@@ -72,8 +102,10 @@
       case "job_started":
         currentJobId = job_id;
         agentLog = [];
+        generationProgress = { current: 0, total: 6 };
         showPipelineCards();
         renderPipeline("research");
+        showActivity("Nytt jobb — analyserar referensbilder...");
         // Add to the top of jobList if not already there
         if (!jobList.find((j) => j.job_id === job_id)) {
           jobList.unshift({
@@ -95,10 +127,13 @@
       case "stage_changed":
         renderPipeline(data.stage);
         updateJobStage(job_id, data.stage);
+        if (data.stage === "generating") {
+          generationProgress = { current: 0, total: 6 };
+        }
+        showActivity(STAGE_LABELS[data.stage] || "Arbetar...");
         break;
 
       case "agent_message":
-      case "progress":
         agentLog.push({
           agent: data.agent,
           message: data.message,
@@ -107,9 +142,31 @@
         renderAgentLog();
         break;
 
+      case "progress":
+        agentLog.push({
+          agent: data.agent,
+          message: data.message,
+          time: new Date(timestamp).toLocaleTimeString("sv-SE"),
+        });
+        renderAgentLog();
+        // Update generation progress from message like "Generating v2-enhanced (2/6)..."
+        const progressMatch = (data.message || "").match(/\((\d+)\/(\d+)\)/);
+        if (progressMatch) {
+          generationProgress.current = parseInt(progressMatch[1], 10);
+          generationProgress.total = parseInt(progressMatch[2], 10);
+          renderPipeline("generating");
+          showActivity("Genererar bilder (" + generationProgress.current + "/" + generationProgress.total + ")...");
+        }
+        break;
+
       case "image_generated":
-        // Will be picked up when card is expanded (lazy-fetch)
+        // Update live image count and re-render
         delete jobDetailCache[job_id];
+        var jobEntry = jobList.find((j) => j.job_id === job_id);
+        if (jobEntry) {
+          jobEntry.image_count = (jobEntry.image_count || 0) + 1;
+          renderGallery();
+        }
         break;
 
       case "variant_scored":
@@ -130,16 +187,17 @@
         renderAgentLog();
         break;
 
-      case "job_completed":
+      case "job_completed": {
         updateJobStage(job_id, "complete");
         renderPipeline("complete");
         delete jobDetailCache[job_id];
+        // Auto-expand the completed job
+        expandedJobId = job_id;
         renderGallery();
-        // Re-expand if this card is open
-        if (expandedJobId === job_id) {
-          fetchAndRenderDetail(job_id);
-        }
+        const imgCount = (data && data.successful_images) || "?";
+        showActivity("Klart! " + imgCount + " bilder genererade.", false, 8000);
         break;
+      }
 
       case "job_failed":
         updateJobStage(job_id, "failed");
@@ -151,6 +209,7 @@
         });
         renderAgentLog();
         renderGallery();
+        showActivity("Fel: " + (data.error || "okänt fel"), true, 10000);
         break;
     }
   }
@@ -186,10 +245,25 @@
       else if (i === stageIndex) iconClass = "active";
 
       const labelClass = i === stageIndex && !isComplete ? "active" : "";
+
+      // Progress bar for generating stage
+      let subProgress = "";
+      if (s.key === "generating" && i === stageIndex && !isComplete && !isFailed) {
+        const pct = generationProgress.total > 0
+          ? Math.round((generationProgress.current / generationProgress.total) * 100)
+          : 0;
+        subProgress = `
+          <div class="stage-progress-bar"><div style="width: ${pct}%"></div></div>
+          <span class="stage-sub-progress">${generationProgress.current}/${generationProgress.total} bilder</span>`;
+      }
+
       return `
         <div class="stage">
           <div class="stage-icon ${iconClass}">${s.icon}</div>
-          <span class="stage-label ${labelClass}">${s.label}</span>
+          <div class="stage-content">
+            <span class="stage-label ${labelClass}">${s.label}</span>
+            ${subProgress}
+          </div>
         </div>`;
     }).join("");
   }
@@ -198,8 +272,8 @@
     const entries = agentLog.slice(-30);
     $agentLog.innerHTML = entries
       .map(
-        (e) => `
-      <div class="log-entry">
+        (e, i) => `
+      <div class="log-entry${i === entries.length - 1 ? " log-entry-latest" : ""}">
         <span class="log-agent">${esc(e.agent)}</span>
         <span>${esc(e.message)}</span>
         <span class="log-time">${e.time}</span>
@@ -374,6 +448,12 @@
           refinementsHtml += "</div>";
         }
 
+        // Feedback state for this variant
+        const fb = (detail.feedback || {})[img.variant] || {};
+        const isUp = fb.rating === 1;
+        const isDown = fb.rating === -1;
+        const isSelected = fb.selected === true;
+
         html += `
           <div class="variant-card">
             <img src="${esc(filePath)}" alt="${esc(img.variant)}"
@@ -381,6 +461,11 @@
             <div class="variant-info">
               <div class="variant-label">${esc(img.variant)}</div>
               ${scoreHtml}
+              <div class="feedback-actions">
+                <button class="btn-feedback${isUp ? " active-up" : ""}" onclick="window.submitFeedback('${esc(detail.job_id)}', '${esc(img.variant)}', ${isUp ? 0 : 1}, false)" title="Bra bild">&#128077;</button>
+                <button class="btn-feedback${isDown ? " active-down" : ""}" onclick="window.submitFeedback('${esc(detail.job_id)}', '${esc(img.variant)}', ${isDown ? 0 : -1}, false)" title="Dålig bild">&#128078;</button>
+                <button class="btn-select${isSelected ? " active" : ""}" onclick="window.submitFeedback('${esc(detail.job_id)}', '${esc(img.variant)}', ${fb.rating || 0}, ${!isSelected})">${isSelected ? "Vald ✓" : "Använd denna"}</button>
+              </div>
               <div class="variant-actions">
                 ${filePath ? `<a class="btn-download" href="${esc(filePath)}" download>Ladda ner</a>` : ""}
                 <button class="btn-refine" onclick="window.showRefineForm('${esc(detail.job_id)}', '${esc(img.variant)}', this)">Refinea</button>
@@ -618,6 +703,36 @@
     }
   };
 
+  // ── Feedback ─────────────────────────────────────────────
+
+  window.submitFeedback = async function (jobId, variant, rating, selected) {
+    try {
+      const formData = new FormData();
+      formData.append("variant", variant);
+      formData.append("rating", rating);
+      formData.append("selected", selected);
+
+      const res = await fetch("/api/jobs/" + jobId + "/feedback", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Feedback error:", err);
+        return;
+      }
+
+      // Invalidate cache and re-render
+      delete jobDetailCache[jobId];
+      if (expandedJobId === jobId) {
+        fetchAndRenderDetail(jobId, true);
+      }
+    } catch (err) {
+      console.error("Feedback network error:", err);
+    }
+  };
+
   // ── Helpers ────────────────────────────────────────────
 
   function esc(str) {
@@ -631,6 +746,17 @@
   async function init() {
     connect();
     await loadJobs();
+
+    // Show pipeline for any active (in-progress) job after page reload
+    const activeJob = jobList.find(
+      (j) => j.stage !== "complete" && j.stage !== "failed"
+    );
+    if (activeJob) {
+      currentJobId = activeJob.job_id;
+      showPipelineCards();
+      renderPipeline(activeJob.stage);
+      showActivity(STAGE_LABELS[activeJob.stage] || "Arbetar...");
+    }
   }
 
   init();

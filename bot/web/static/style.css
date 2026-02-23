@@ -727,6 +727,148 @@ header .status-dot.disconnected { background: var(--red); }
   font-size: 0.85rem;
 }
 
+/* ── Activity Banner ────────────────────────────── */
+
+.activity-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1rem;
+  background: linear-gradient(135deg, var(--forest), var(--main-green));
+  color: var(--cream);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: var(--shadow);
+  animation: slideInBanner 0.3s ease-out;
+}
+
+.activity-banner.banner-error {
+  background: linear-gradient(135deg, #991b1b, var(--red));
+}
+
+@keyframes slideInBanner {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  flex-shrink: 0;
+  animation: pulseDot 1.5s infinite;
+}
+
+.activity-banner.banner-error .activity-dot {
+  background: #fca5a5;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Progress bar in pipeline card ─────────────── */
+
+.stage-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stage-sub-progress {
+  font-size: 0.75rem;
+  color: var(--gray-600);
+}
+
+.stage-progress-bar {
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.15rem;
+}
+
+.stage-progress-bar > div {
+  height: 100%;
+  background: var(--amber);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* ── Log entry highlight ───────────────────────── */
+
+.log-entry-latest {
+  background: var(--soft-green);
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 0.4rem 0.3rem;
+}
+
+/* ── Feedback actions ──────────────────────────── */
+
+.feedback-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  align-items: center;
+}
+
+.btn-feedback {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--gray-200);
+  background: var(--white);
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.btn-feedback:hover {
+  background: var(--gray-100);
+  transform: scale(1.1);
+}
+
+.btn-feedback.active-up {
+  background: #dcfce7;
+  border-color: #166534;
+}
+
+.btn-feedback.active-down {
+  background: #fee2e2;
+  border-color: #991b1b;
+}
+
+.btn-select {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  font-weight: 600;
+  background: var(--white);
+  color: var(--forest);
+  border: 1px solid var(--forest);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  margin-left: 0.3rem;
+}
+
+.btn-select:hover {
+  background: var(--soft-green);
+}
+
+.btn-select.active {
+  background: var(--forest);
+  color: var(--cream);
+}
+
 /* ── Scrollbar ──────────────────────────────────── */
 
 ::-webkit-scrollbar { width: 6px; }
