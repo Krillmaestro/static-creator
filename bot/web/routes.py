@@ -177,9 +177,13 @@ async def generate(
     prompt: str = Form(...),
     aspect_ratio: str = Form("1:1"),
     resolution: str = Form("2K"),
+    password: str = Form(""),
     files: list[UploadFile] = File(default=[]),
 ) -> JSONResponse:
     """Accept a generation request from the web form."""
+
+    if password != "apoteket":
+        return JSONResponse({"error": "Fel lösenord"}, status_code=403)
 
     ref_paths: list[str] = []
 

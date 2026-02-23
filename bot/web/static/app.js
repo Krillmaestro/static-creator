@@ -591,10 +591,12 @@
     $submitBtn.disabled = true;
     $submitBtn.textContent = "Skickar...";
 
+    const $password = document.getElementById("password-input");
     const formData = new FormData();
     formData.append("prompt", prompt);
     formData.append("aspect_ratio", $aspect.value);
     formData.append("resolution", $resolution.value);
+    formData.append("password", $password ? $password.value : "");
     for (const f of uploadedFiles) {
       formData.append("files", f);
     }
