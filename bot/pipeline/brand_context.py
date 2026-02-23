@@ -24,13 +24,13 @@ Meta/Instagram/TikTok.
 - Premium dog probiotics supplement
 - Natural ingredients, Swedish-made
 - Target audience: Health-conscious dog owners in Scandinavia
-- The product jar/packaging should be prominently featured in every image
+- The REAL product jar/packaging (from the attached reference photo) must be reproduced exactly in every image — same shape, label, logo, colors
 
 ## Ad Static Format Requirements
 Every generated image MUST be a complete social media ad creative containing:
 1. **Bold headline text** at the top (large, attention-grabbing, in Swedish)
 2. **Subheadline** below the headline (supporting claim)
-3. **Product jar/packaging** prominently placed (center or center-right)
+3. **The exact product jar from the reference photo** prominently placed (center or center-right) — reproduced faithfully, NOT a generic jar
 4. **Benefit bullet points** (3-4 rounded pill/badge shapes with icons + short text)
 5. **CTA banner** at the bottom (e.g., "Köp nu", "Testa idag", "Se resultat på X veckor")
 6. **Professional photography background** (dog in nature, lifestyle setting)

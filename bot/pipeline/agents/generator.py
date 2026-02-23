@@ -41,6 +41,13 @@ def _generate_single(
     if reference_images:
         for ref_img in reference_images:
             contents.append(ref_img)
+        # Explicit instruction so Gemini knows what the reference images are
+        contents.append(
+            "The first attached image is the REAL ApotekHunden product jar. "
+            "You MUST reproduce this exact jar — its shape, white container, "
+            "forest green label, logo, and all text — faithfully in the generated image. "
+            "Do NOT invent a different jar design.\n\n"
+        )
     contents.append(prompt)
 
     response = client.models.generate_content(
