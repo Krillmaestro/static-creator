@@ -1,22 +1,39 @@
-/* Banana Squad Dashboard — WebSocket client + DOM updates */
+/* Banana Squad Dashboard v2 — Form + Gallery + WebSocket */
 
 (function () {
   "use strict";
 
   // ── State ──────────────────────────────────────────────
   let ws = null;
-  let currentJobId = null;
-  let jobs = {};
+  let currentJobId = null;       // Job currently being tracked (live pipeline)
+  let expandedJobId = null;      // Job whose gallery card is expanded
+  let jobList = [];              // Array from GET /api/jobs
+  let jobDetailCache = {};       // job_id → full detail JSON
   let agentLog = [];
+  let uploadedFiles = [];        // Files from the form
+  let searchDebounce = null;
 
   // ── DOM refs ───────────────────────────────────────────
   const $statusDot = document.getElementById("status-dot");
   const $statusText = document.getElementById("status-text");
   const $stages = document.getElementById("pipeline-stages");
   const $agentLog = document.getElementById("agent-log");
-  const $imageGrid = document.getElementById("image-grid");
-  const $jobList = document.getElementById("job-list");
-  const $jobTitle = document.getElementById("job-title");
+  const $pipelineCard = document.getElementById("pipeline-card");
+  const $logCard = document.getElementById("log-card");
+  const $gallery = document.getElementById("job-gallery");
+  const $searchInput = document.getElementById("search-input");
+  const $sortSelect = document.getElementById("sort-select");
+
+  // Form refs
+  const $form = document.getElementById("generate-form");
+  const $prompt = document.getElementById("prompt-input");
+  const $aspect = document.getElementById("aspect-select");
+  const $resolution = document.getElementById("resolution-select");
+  const $fileInput = document.getElementById("file-input");
+  const $dropZone = document.getElementById("file-drop-zone");
+  const $filePreviews = document.getElementById("file-previews");
+  const $submitBtn = document.getElementById("submit-btn");
+  const $fileBrowse = document.getElementById("file-browse");
 
   // ── WebSocket ──────────────────────────────────────────
 
@@ -39,8 +56,7 @@
 
     ws.onmessage = (e) => {
       try {
-        const event = JSON.parse(e.data);
-        handleEvent(event);
+        handleEvent(JSON.parse(e.data));
       } catch (err) {
         console.error("WS parse error:", err);
       }
@@ -52,93 +68,90 @@
   function handleEvent(event) {
     const { type, job_id, data, timestamp } = event;
 
-    // Track job
-    if (!jobs[job_id]) {
-      jobs[job_id] = {
-        id: job_id,
-        stage: "queued",
-        prompt: data.prompt || "",
-        images: [],
-        scores: [],
-        agentLog: [],
-      };
-    }
-    const job = jobs[job_id];
-
     switch (type) {
       case "job_started":
-        job.prompt = data.prompt || job.prompt;
-        job.stage = "research";
         currentJobId = job_id;
-        renderJobList();
-        renderPipeline(job);
-        clearImages();
-        $jobTitle.textContent = job.prompt || "Nytt jobb";
+        agentLog = [];
+        showPipelineCards();
+        renderPipeline("research");
+        // Add to the top of jobList if not already there
+        if (!jobList.find((j) => j.job_id === job_id)) {
+          jobList.unshift({
+            job_id: job_id,
+            prompt: data.prompt || "",
+            stage: "research",
+            created_at: timestamp,
+            completed_at: null,
+            image_count: 0,
+            winner: null,
+            winner_path: null,
+          });
+        }
+        // Invalidate cache for this job
+        delete jobDetailCache[job_id];
+        renderGallery();
         break;
 
       case "stage_changed":
-        job.stage = data.stage;
-        renderPipeline(job);
+        renderPipeline(data.stage);
+        updateJobStage(job_id, data.stage);
         break;
 
       case "agent_message":
-        const logEntry = {
+      case "progress":
+        agentLog.push({
           agent: data.agent,
           message: data.message,
           time: new Date(timestamp).toLocaleTimeString("sv-SE"),
-        };
-        agentLog.push(logEntry);
-        job.agentLog.push(logEntry);
+        });
         renderAgentLog();
         break;
 
-      case "progress":
-        addAgentLogEntry({
-          agent: data.agent,
-          message: data.message,
-          time: new Date(timestamp).toLocaleTimeString("sv-SE"),
-        });
-        break;
-
       case "image_generated":
-        job.images.push({
-          variant: data.variant,
-          file_path: data.file_path,
-          index: data.index,
-        });
-        renderImages(job);
+        // Will be picked up when card is expanded (lazy-fetch)
+        delete jobDetailCache[job_id];
         break;
 
       case "variant_scored":
-        job.scores.push({
-          variant: data.variant,
-          scores: data.scores,
-          rank: data.rank,
-          review: data.review,
-        });
-        renderImages(job);
+        delete jobDetailCache[job_id];
         break;
 
       case "job_completed":
-        job.stage = "complete";
-        renderPipeline(job);
-        renderJobList();
+        updateJobStage(job_id, "complete");
+        renderPipeline("complete");
+        delete jobDetailCache[job_id];
+        renderGallery();
+        // Re-expand if this card is open
+        if (expandedJobId === job_id) {
+          fetchAndRenderDetail(job_id);
+        }
         break;
 
       case "job_failed":
-        job.stage = "failed";
-        renderPipeline(job);
-        renderJobList();
-        addAgentLogEntry({
+        updateJobStage(job_id, "failed");
+        renderPipeline("failed");
+        agentLog.push({
           agent: "system",
-          message: `Fel: ${data.error}`,
+          message: "Fel: " + (data.error || "unknown"),
           time: new Date(timestamp).toLocaleTimeString("sv-SE"),
         });
+        renderAgentLog();
+        renderGallery();
         break;
     }
   }
 
-  // ── Renderers ──────────────────────────────────────────
+  function updateJobStage(jobId, stage) {
+    const job = jobList.find((j) => j.job_id === jobId);
+    if (job) job.stage = stage;
+  }
+
+  // ── Pipeline + Log Cards ───────────────────────────────
+
+  function showPipelineCards() {
+    $pipelineCard.style.display = "";
+    $logCard.style.display = "";
+  }
 
   const STAGES = [
     { key: "research", icon: "🔍", label: "Analys" },
@@ -147,10 +160,10 @@
     { key: "evaluating", icon: "⭐", label: "Utvärdering" },
   ];
 
-  function renderPipeline(job) {
-    const stageIndex = STAGES.findIndex((s) => s.key === job.stage);
-    const isFailed = job.stage === "failed";
-    const isComplete = job.stage === "complete";
+  function renderPipeline(currentStage) {
+    const stageIndex = STAGES.findIndex((s) => s.key === currentStage);
+    const isFailed = currentStage === "failed";
+    const isComplete = currentStage === "complete";
 
     $stages.innerHTML = STAGES.map((s, i) => {
       let iconClass = "pending";
@@ -159,7 +172,6 @@
       else if (i === stageIndex) iconClass = "active";
 
       const labelClass = i === stageIndex && !isComplete ? "active" : "";
-
       return `
         <div class="stage">
           <div class="stage-icon ${iconClass}">${s.icon}</div>
@@ -174,8 +186,8 @@
       .map(
         (e) => `
       <div class="log-entry">
-        <span class="log-agent">${escapeHtml(e.agent)}</span>
-        <span>${escapeHtml(e.message)}</span>
+        <span class="log-agent">${esc(e.agent)}</span>
+        <span>${esc(e.message)}</span>
         <span class="log-time">${e.time}</span>
       </div>`
       )
@@ -183,30 +195,123 @@
     $agentLog.scrollTop = $agentLog.scrollHeight;
   }
 
-  function addAgentLogEntry(entry) {
-    agentLog.push(entry);
-    renderAgentLog();
-  }
+  // ── Gallery ────────────────────────────────────────────
 
-  function renderImages(job) {
-    if (!job.images.length) {
-      $imageGrid.innerHTML = `
+  function renderGallery() {
+    if (!jobList.length) {
+      $gallery.innerHTML = `
         <div class="empty-state">
           <div class="emoji">🎨</div>
-          <p>Bilder visas här när de genereras...</p>
+          <p>Inga jobb ännu. Generera bilder med formuläret!</p>
         </div>`;
       return;
     }
 
-    $imageGrid.innerHTML = job.images
-      .map((img) => {
-        const scoreData = job.scores.find((s) => s.variant === img.variant);
-        const filePath = img.file_path.includes("/outputs/")
-          ? "/outputs/" + img.file_path.split("/outputs/")[1]
-          : "/outputs/" + img.file_path;
+    $gallery.innerHTML = jobList
+      .map((j) => {
+        const isExpanded = expandedJobId === j.job_id;
+        const statusInfo = stageStatus(j.stage);
+        const thumbSrc = j.winner_path
+          ? "/outputs/" + j.winner_path
+          : null;
+        const date = j.created_at
+          ? new Date(j.created_at).toLocaleDateString("sv-SE")
+          : "";
+
+        return `
+          <div class="gallery-card ${isExpanded ? "expanded" : ""}" id="card-${j.job_id}">
+            <div class="gallery-card-header" onclick="toggleJob('${j.job_id}')">
+              ${
+                thumbSrc
+                  ? `<img class="gallery-card-thumb" src="${esc(thumbSrc)}" alt="thumb" loading="lazy">`
+                  : `<div class="gallery-card-thumb" style="display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🎨</div>`
+              }
+              <div class="gallery-card-info">
+                <div class="gallery-card-prompt">${esc(j.prompt || j.job_id)}</div>
+                <div class="gallery-card-meta">${date} · ${j.image_count || 0} bilder</div>
+              </div>
+              <span class="gallery-card-status ${statusInfo.cls}">${statusInfo.label}</span>
+              <span class="gallery-card-chevron">▶</span>
+            </div>
+            <div class="gallery-card-body" id="detail-${j.job_id}">
+              ${isExpanded ? '<div class="loading-spinner">Laddar...</div>' : ""}
+            </div>
+          </div>`;
+      })
+      .join("");
+
+    // If a card is expanded, fetch its detail
+    if (expandedJobId) {
+      fetchAndRenderDetail(expandedJobId);
+    }
+  }
+
+  function stageStatus(stage) {
+    if (stage === "complete") return { cls: "complete", label: "Klar" };
+    if (stage === "failed") return { cls: "failed", label: "Misslyckades" };
+    return { cls: "running", label: "Arbetar..." };
+  }
+
+  window.toggleJob = function (jobId) {
+    if (expandedJobId === jobId) {
+      expandedJobId = null;
+      renderGallery();
+    } else {
+      expandedJobId = jobId;
+      renderGallery();
+    }
+  };
+
+  async function fetchAndRenderDetail(jobId) {
+    const $container = document.getElementById("detail-" + jobId);
+    if (!$container) return;
+
+    // Use cache if available
+    if (jobDetailCache[jobId]) {
+      renderJobDetail(jobDetailCache[jobId], $container);
+      return;
+    }
+
+    $container.innerHTML = '<div class="loading-spinner">Laddar detaljer...</div>';
+
+    try {
+      const res = await fetch("/api/jobs/" + jobId);
+      if (!res.ok) throw new Error("Not found");
+      const detail = await res.json();
+      jobDetailCache[jobId] = detail;
+      renderJobDetail(detail, $container);
+    } catch (err) {
+      $container.innerHTML = '<div class="loading-spinner">Kunde inte ladda jobb.</div>';
+    }
+  }
+
+  function renderJobDetail(detail, $container) {
+    let html = "";
+
+    // Research info
+    if (detail.research && detail.research.style) {
+      html += `
+        <div class="research-detail">
+          <strong>Stil:</strong> ${esc(detail.research.style.slice(0, 200))}${detail.research.style.length > 200 ? "..." : ""}
+          ${detail.research.mood ? `<br><strong>Mood:</strong> ${esc(detail.research.mood)}` : ""}
+          ${detail.research.colors && detail.research.colors.length ? `<br><strong>Färger:</strong> ${esc(detail.research.colors.join(", "))}` : ""}
+        </div>`;
+    }
+
+    // Variant images
+    const images = (detail.images || []).filter((img) => img.success);
+    const evals = detail.evaluations || [];
+
+    if (images.length) {
+      html += '<div class="variant-grid">';
+      for (const img of images) {
+        const filePath = img.file_path
+          ? "/outputs/" + img.file_path
+          : "";
+        const ev = evals.find((e) => e.variant === img.variant);
 
         let scoreHtml = "";
-        if (scoreData) {
+        if (ev) {
           const dims = ["faithfulness", "conciseness", "readability", "aesthetics"];
           scoreHtml = dims
             .map(
@@ -214,129 +319,192 @@
             <div class="score-bar-container">
               <span>${d.charAt(0).toUpperCase() + d.slice(1, 5)}</span>
               <div class="score-bar">
-                <div class="score-bar-fill" style="width: ${(scoreData.scores[d] / 10) * 100}%"></div>
+                <div class="score-bar-fill" style="width: ${(ev.scores[d] / 10) * 100}%"></div>
               </div>
-              <span>${scoreData.scores[d].toFixed(1)}</span>
+              <span>${ev.scores[d].toFixed(1)}</span>
             </div>`
             )
             .join("");
 
-          const rankClass = scoreData.rank <= 3 ? `rank-${scoreData.rank}` : "";
-          const medal = { 1: "🥇", 2: "🥈", 3: "🥉" }[scoreData.rank] || `#${scoreData.rank}`;
-          scoreHtml += `<div class="rank-badge ${rankClass}">${medal} ${scoreData.scores.total.toFixed(1)}/40</div>`;
+          const rankClass = ev.rank <= 3 ? "rank-" + ev.rank : "";
+          const medal = { 1: "🥇", 2: "🥈", 3: "🥉" }[ev.rank] || "#" + ev.rank;
+          scoreHtml += `<span class="rank-badge ${rankClass}">${medal} ${ev.scores.total.toFixed(1)}/40</span>`;
         }
 
-        return `
-          <div class="image-card">
-            <img src="${escapeHtml(filePath)}" alt="${escapeHtml(img.variant)}"
-                 onclick="window.open('${escapeHtml(filePath)}', '_blank')" loading="lazy">
-            <div class="image-info">
-              <div class="variant-label">${escapeHtml(img.variant)}</div>
+        html += `
+          <div class="variant-card">
+            <img src="${esc(filePath)}" alt="${esc(img.variant)}"
+                 onclick="window.open('${esc(filePath)}', '_blank')" loading="lazy">
+            <div class="variant-info">
+              <div class="variant-label">${esc(img.variant)}</div>
               ${scoreHtml}
+              ${filePath ? `<a class="btn-download" href="${esc(filePath)}" download>Ladda ner</a>` : ""}
             </div>
           </div>`;
-      })
-      .join("");
-  }
-
-  function clearImages() {
-    agentLog = [];
-    $agentLog.innerHTML = "";
-    $imageGrid.innerHTML = `
-      <div class="empty-state">
-        <div class="emoji">🎨</div>
-        <p>Bilder visas här när de genereras...</p>
-      </div>`;
-  }
-
-  function renderJobList() {
-    const jobArr = Object.values(jobs).reverse();
-    if (!jobArr.length) {
-      $jobList.innerHTML = `
-        <div class="empty-state">
-          <div class="emoji">📋</div>
-          <p>Inga jobb ännu. Skicka en beskrivning via Telegram!</p>
-        </div>`;
-      return;
+      }
+      html += "</div>";
+    } else if (detail.stage !== "complete" && detail.stage !== "failed") {
+      html += '<div class="loading-spinner">Genererar bilder...</div>';
+    } else {
+      html += '<div class="loading-spinner">Inga bilder genererades.</div>';
     }
 
-    $jobList.innerHTML = jobArr
-      .map((j) => {
-        const active = j.id === currentJobId ? "active" : "";
-        let statusClass = "running";
-        let statusLabel = "Arbetar...";
-        if (j.stage === "complete") {
-          statusClass = "complete";
-          statusLabel = "Klar";
-        } else if (j.stage === "failed") {
-          statusClass = "failed";
-          statusLabel = "Misslyckades";
-        }
+    // Summary
+    if (detail.summary) {
+      html += `<div class="research-detail" style="margin-top:0.75rem">
+        <strong>Sammanfattning:</strong> ${esc(detail.summary)}
+      </div>`;
+    }
 
+    $container.innerHTML = html;
+  }
+
+  // ── Search & Sort ──────────────────────────────────────
+
+  async function loadJobs() {
+    const search = $searchInput.value.trim();
+    const sort = $sortSelect.value;
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (sort) params.set("sort", sort);
+
+    try {
+      const res = await fetch("/api/jobs?" + params.toString());
+      jobList = await res.json();
+      renderGallery();
+    } catch (err) {
+      console.error("Failed to load jobs:", err);
+    }
+  }
+
+  $searchInput.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadJobs, 350);
+  });
+
+  $sortSelect.addEventListener("change", loadJobs);
+
+  // ── Form: File Upload ──────────────────────────────────
+
+  $fileBrowse.addEventListener("click", (e) => {
+    e.preventDefault();
+    $fileInput.click();
+  });
+
+  $dropZone.addEventListener("click", () => $fileInput.click());
+
+  $dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    $dropZone.classList.add("dragover");
+  });
+
+  $dropZone.addEventListener("dragleave", () => {
+    $dropZone.classList.remove("dragover");
+  });
+
+  $dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    $dropZone.classList.remove("dragover");
+    addFiles(e.dataTransfer.files);
+  });
+
+  $fileInput.addEventListener("change", () => {
+    addFiles($fileInput.files);
+    $fileInput.value = "";
+  });
+
+  function addFiles(fileList) {
+    for (const f of fileList) {
+      if (f.type.startsWith("image/")) {
+        uploadedFiles.push(f);
+      }
+    }
+    renderFilePreviews();
+  }
+
+  function renderFilePreviews() {
+    $filePreviews.innerHTML = uploadedFiles
+      .map((f, i) => {
+        const url = URL.createObjectURL(f);
         return `
-          <div class="job-item ${active}" onclick="selectJob('${j.id}')">
-            <span class="job-prompt">${escapeHtml(j.prompt || j.id)}</span>
-            <span class="job-status ${statusClass}">${statusLabel}</span>
+          <div class="file-preview">
+            <img src="${url}" alt="${esc(f.name)}">
+            <button type="button" class="remove-file" onclick="removeFile(${i})">×</button>
           </div>`;
       })
       .join("");
   }
+
+  window.removeFile = function (index) {
+    uploadedFiles.splice(index, 1);
+    renderFilePreviews();
+  };
+
+  // ── Form: Submit ───────────────────────────────────────
+
+  $form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const prompt = $prompt.value.trim();
+    if (!prompt) return;
+
+    $submitBtn.disabled = true;
+    $submitBtn.textContent = "Skickar...";
+
+    const formData = new FormData();
+    formData.append("prompt", prompt);
+    formData.append("aspect_ratio", $aspect.value);
+    formData.append("resolution", $resolution.value);
+    for (const f of uploadedFiles) {
+      formData.append("files", f);
+    }
+
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Fel: " + (err.detail || err.error || "Okänt fel"));
+        return;
+      }
+
+      const { job_id } = await res.json();
+      currentJobId = job_id;
+
+      // Clear form
+      $prompt.value = "";
+      uploadedFiles = [];
+      renderFilePreviews();
+
+      // Show pipeline cards
+      agentLog = [];
+      showPipelineCards();
+      renderPipeline("queued");
+      renderAgentLog();
+    } catch (err) {
+      alert("Nätverksfel: " + err.message);
+    } finally {
+      $submitBtn.disabled = false;
+      $submitBtn.textContent = "Generera 5 varianter";
+    }
+  });
 
   // ── Helpers ────────────────────────────────────────────
 
-  function escapeHtml(str) {
+  function esc(str) {
     const el = document.createElement("span");
     el.textContent = str || "";
     return el.innerHTML;
   }
 
-  // ── Public API ─────────────────────────────────────────
-
-  window.selectJob = function (jobId) {
-    currentJobId = jobId;
-    const job = jobs[jobId];
-    if (!job) return;
-
-    agentLog = [...job.agentLog];
-    $jobTitle.textContent = job.prompt || jobId;
-    renderPipeline(job);
-    renderAgentLog();
-    renderImages(job);
-    renderJobList();
-  };
-
   // ── Init ───────────────────────────────────────────────
 
   async function init() {
     connect();
-
-    // Load existing jobs
-    try {
-      const res = await fetch("/api/jobs");
-      const data = await res.json();
-      for (const j of data) {
-        jobs[j.job_id] = {
-          id: j.job_id,
-          stage: j.stage,
-          prompt: j.prompt,
-          images: [],
-          scores: [],
-          agentLog: [],
-        };
-      }
-      renderJobList();
-    } catch (err) {
-      console.error("Failed to load jobs:", err);
-    }
-
-    // Reset pipeline view
-    $stages.innerHTML = STAGES.map(
-      (s) => `
-      <div class="stage">
-        <div class="stage-icon pending">${s.icon}</div>
-        <span class="stage-label">${s.label}</span>
-      </div>`
-    ).join("");
+    await loadJobs();
   }
 
   init();

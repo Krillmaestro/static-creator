@@ -27,9 +27,11 @@ PORT: int = int(os.environ.get("PORT", "8000"))
 
 # ── Paths ──────────────────────────────────────────────────────────
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
-OUTPUTS_DIR: Path = PROJECT_ROOT / "outputs"
+DATA_DIR: Path = Path(os.environ.get("DATA_DIR", str(PROJECT_ROOT / "data")))
+OUTPUTS_DIR: Path = Path(os.environ.get("OUTPUTS_DIR", str(PROJECT_ROOT / "outputs")))
 REFERENCE_DIR: Path = PROJECT_ROOT / "reference-images"
-OUTPUTS_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 REFERENCE_DIR.mkdir(exist_ok=True)
 
 # ── Gemini defaults ────────────────────────────────────────────────

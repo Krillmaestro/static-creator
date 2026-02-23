@@ -21,59 +21,88 @@
     <!-- Sidebar -->
     <div class="sidebar">
 
-      <!-- Pipeline Progress -->
+      <!-- Generation Form -->
       <div class="card">
+        <div class="card-header">🎨 Generera bilder</div>
+        <div class="card-body">
+          <form id="generate-form">
+            <div class="form-group">
+              <label for="prompt-input">Beskriv bilden</label>
+              <textarea id="prompt-input" rows="3" placeholder="Beskriv vad du vill generera..."></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group form-group-half">
+                <label for="aspect-select">Format</label>
+                <select id="aspect-select">
+                  <option value="4:3" selected>4:3</option>
+                  <option value="3:4">3:4</option>
+                  <option value="16:9">16:9</option>
+                  <option value="9:16">9:16</option>
+                  <option value="1:1">1:1</option>
+                  <option value="3:2">3:2</option>
+                  <option value="2:3">2:3</option>
+                  <option value="4:5">4:5</option>
+                  <option value="5:4">5:4</option>
+                  <option value="21:9">21:9</option>
+                </select>
+              </div>
+              <div class="form-group form-group-half">
+                <label for="resolution-select">Upplösning</label>
+                <select id="resolution-select">
+                  <option value="1K">1K</option>
+                  <option value="2K" selected>2K</option>
+                  <option value="4K">4K</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Referensbilder (valfritt)</label>
+              <div id="file-drop-zone" class="file-drop-zone">
+                <input type="file" id="file-input" multiple accept="image/*" hidden>
+                <p>Dra & släpp bilder hit, eller <a href="#" id="file-browse">bläddra</a></p>
+              </div>
+              <div id="file-previews" class="file-previews"></div>
+            </div>
+            <button type="submit" class="btn-primary" id="submit-btn">Generera 5 varianter</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Pipeline Progress -->
+      <div class="card" id="pipeline-card" style="display:none;">
         <div class="card-header">📊 Pipeline</div>
         <div class="card-body">
-          <div id="pipeline-stages" class="pipeline-stages">
-            <!-- Filled by JS -->
-          </div>
+          <div id="pipeline-stages" class="pipeline-stages"></div>
         </div>
       </div>
 
       <!-- Agent Log -->
-      <div class="card">
+      <div class="card" id="log-card" style="display:none;">
         <div class="card-header">💬 Agent-logg</div>
         <div class="card-body">
-          <div id="agent-log" class="agent-log">
-            <div class="empty-state">
-              <p>Väntar på aktivitet...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Job History -->
-      <div class="card">
-        <div class="card-header">📋 Jobbhistorik</div>
-        <div class="card-body">
-          <div id="job-list" class="job-list">
-            <div class="empty-state">
-              <div class="emoji">📋</div>
-              <p>Inga jobb ännu. Skicka en beskrivning via Telegram!</p>
-            </div>
-          </div>
+          <div id="agent-log" class="agent-log"></div>
         </div>
       </div>
 
     </div>
 
-    <!-- Main Content -->
+    <!-- Main Content: Gallery -->
     <div class="main-content">
 
-      <!-- Current Job Header -->
-      <div class="card">
-        <div class="card-header">🎨 Genererade bilder</div>
-        <div class="card-body">
-          <h2 id="job-title" style="font-family: 'DM Serif Display', serif; font-size: 1.2rem; margin-bottom: 1rem; color: var(--forest);">
-            Väntar på nytt jobb...
-          </h2>
-          <div id="image-grid" class="image-grid">
-            <div class="empty-state">
-              <div class="emoji">🎨</div>
-              <p>Bilder visas här när de genereras...</p>
-            </div>
-          </div>
+      <!-- Search + Sort -->
+      <div class="gallery-toolbar">
+        <input type="text" id="search-input" class="search-input" placeholder="Sök bland jobb...">
+        <select id="sort-select" class="sort-select">
+          <option value="newest">Nyast först</option>
+          <option value="oldest">Äldst först</option>
+        </select>
+      </div>
+
+      <!-- Job Gallery -->
+      <div id="job-gallery" class="job-gallery">
+        <div class="empty-state">
+          <div class="emoji">🎨</div>
+          <p>Inga jobb ännu. Generera bilder med formuläret!</p>
         </div>
       </div>
 

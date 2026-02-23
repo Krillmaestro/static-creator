@@ -52,6 +52,7 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResult:
             reference_image_paths=request.reference_image_paths,
         )
         result.research = research
+        job_store.update_result(result)
 
         await event_bus.emit(Event(
             type=EventType.AGENT_MESSAGE,
@@ -81,6 +82,7 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResult:
             research=research,
         )
         result.prompts = prompts
+        job_store.update_result(result)
 
         await event_bus.emit(Event(
             type=EventType.AGENT_MESSAGE,
@@ -107,6 +109,7 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResult:
             reference_image_paths=request.reference_image_paths,
         )
         result.images = images
+        job_store.update_result(result)
 
         successful = sum(1 for img in images if img.success)
         await event_bus.emit(Event(
@@ -133,6 +136,7 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResult:
                 images=images,
             )
             result.evaluation = evaluation
+            job_store.update_result(result)
 
             await event_bus.emit(Event(
                 type=EventType.AGENT_MESSAGE,
@@ -146,6 +150,7 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResult:
         # ── Complete ───────────────────────────────────────────────
         result.stage = PipelineStage.COMPLETE
         result.completed_at = datetime.now(timezone.utc)
+        job_store.update_result(result)
 
         await event_bus.emit(Event(
             type=EventType.JOB_COMPLETED,
@@ -163,6 +168,7 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResult:
         result.stage = PipelineStage.FAILED
         result.error = str(e)
         result.completed_at = datetime.now(timezone.utc)
+        job_store.update_result(result)
 
         await event_bus.emit(Event(
             type=EventType.JOB_FAILED,
