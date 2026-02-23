@@ -116,6 +116,20 @@
         delete jobDetailCache[job_id];
         break;
 
+      case "image_refined":
+        delete jobDetailCache[job_id];
+        // Re-render if this card is expanded
+        if (expandedJobId === job_id) {
+          fetchAndRenderDetail(job_id, true);
+        }
+        agentLog.push({
+          agent: "generator",
+          message: "Förfinad variant: " + (data.variant || ""),
+          time: new Date(timestamp).toLocaleTimeString("sv-SE"),
+        });
+        renderAgentLog();
+        break;
+
       case "job_completed":
         updateJobStage(job_id, "complete");
         renderPipeline("complete");
@@ -262,12 +276,12 @@
     }
   };
 
-  async function fetchAndRenderDetail(jobId) {
+  async function fetchAndRenderDetail(jobId, forceRefresh) {
     const $container = document.getElementById("detail-" + jobId);
     if (!$container) return;
 
-    // Use cache if available
-    if (jobDetailCache[jobId]) {
+    // Use cache if available (unless force refresh)
+    if (!forceRefresh && jobDetailCache[jobId]) {
       renderJobDetail(jobDetailCache[jobId], $container);
       return;
     }
@@ -331,6 +345,35 @@
           scoreHtml += `<span class="rank-badge ${rankClass}">${medal} ${ev.scores.total.toFixed(1)}/40</span>`;
         }
 
+        // Find refinements for this variant
+        const variantRefinements = (detail.refinements || []).filter(
+          (r) => r.variant === img.variant
+        );
+
+        let refinementsHtml = "";
+        if (variantRefinements.length) {
+          refinementsHtml = '<div class="refinement-list">';
+          for (const ref of variantRefinements) {
+            const refPath = ref.refined_path
+              ? "/outputs/" + ref.refined_path
+              : "";
+            const refDate = ref.created_at
+              ? new Date(ref.created_at).toLocaleTimeString("sv-SE")
+              : "";
+            refinementsHtml += `
+              <div class="refinement-row">
+                ${refPath ? `<img src="${esc(refPath)}" alt="Refined"
+                     onclick="window.open('${esc(refPath)}', '_blank')" loading="lazy">` : ""}
+                <div class="refinement-meta">
+                  ${ref.instruction ? `<span class="refinement-instruction">${esc(ref.instruction)}</span>` : '<span class="refinement-instruction">Allmän förbättring</span>'}
+                  <span class="refinement-time">${refDate}</span>
+                  ${refPath ? `<a class="btn-download" href="${esc(refPath)}" download>Ladda ner</a>` : ""}
+                </div>
+              </div>`;
+          }
+          refinementsHtml += "</div>";
+        }
+
         html += `
           <div class="variant-card">
             <img src="${esc(filePath)}" alt="${esc(img.variant)}"
@@ -338,7 +381,19 @@
             <div class="variant-info">
               <div class="variant-label">${esc(img.variant)}</div>
               ${scoreHtml}
-              ${filePath ? `<a class="btn-download" href="${esc(filePath)}" download>Ladda ner</a>` : ""}
+              <div class="variant-actions">
+                ${filePath ? `<a class="btn-download" href="${esc(filePath)}" download>Ladda ner</a>` : ""}
+                <button class="btn-refine" onclick="window.showRefineForm('${esc(detail.job_id)}', '${esc(img.variant)}', this)">Refinea</button>
+              </div>
+              <div class="refine-form" id="refine-form-${esc(detail.job_id)}-${esc(img.variant)}" style="display:none">
+                <input type="text" class="refine-input" placeholder="Instruktioner (valfritt)..."
+                       id="refine-input-${esc(detail.job_id)}-${esc(img.variant)}">
+                <div class="refine-form-actions">
+                  <button class="btn-refine-submit" onclick="window.submitRefine('${esc(detail.job_id)}', '${esc(img.variant)}')">Skicka</button>
+                  <button class="btn-refine-cancel" onclick="window.cancelRefine('${esc(detail.job_id)}', '${esc(img.variant)}')">Avbryt</button>
+                </div>
+              </div>
+              ${refinementsHtml}
             </div>
           </div>`;
       }
@@ -491,6 +546,77 @@
       $submitBtn.textContent = "Generera 6 varianter";
     }
   });
+
+  // ── Refine ─────────────────────────────────────────────
+
+  window.showRefineForm = function (jobId, variant, btn) {
+    const formId = "refine-form-" + jobId + "-" + variant;
+    const $form = document.getElementById(formId);
+    if ($form) {
+      $form.style.display = "block";
+      const $input = document.getElementById("refine-input-" + jobId + "-" + variant);
+      if ($input) $input.focus();
+    }
+  };
+
+  window.cancelRefine = function (jobId, variant) {
+    const formId = "refine-form-" + jobId + "-" + variant;
+    const $form = document.getElementById(formId);
+    if ($form) $form.style.display = "none";
+  };
+
+  window.submitRefine = async function (jobId, variant) {
+    const inputId = "refine-input-" + jobId + "-" + variant;
+    const $input = document.getElementById(inputId);
+    const instruction = $input ? $input.value.trim() : "";
+
+    const formId = "refine-form-" + jobId + "-" + variant;
+    const $form = document.getElementById(formId);
+
+    // Disable form while submitting
+    const $submitBtn = $form ? $form.querySelector(".btn-refine-submit") : null;
+    if ($submitBtn) {
+      $submitBtn.disabled = true;
+      $submitBtn.textContent = "Skickar...";
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("job_id", jobId);
+      formData.append("variant", variant);
+      formData.append("instruction", instruction);
+
+      const res = await fetch("/api/refine", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Fel: " + (err.error || "Okänt fel"));
+        return;
+      }
+
+      // Hide form and show progress in agent log
+      if ($form) $form.style.display = "none";
+      if ($input) $input.value = "";
+
+      agentLog.push({
+        agent: "generator",
+        message: "Förfinar " + variant + "...",
+        time: new Date().toLocaleTimeString("sv-SE"),
+      });
+      showPipelineCards();
+      renderAgentLog();
+    } catch (err) {
+      alert("Nätverksfel: " + err.message);
+    } finally {
+      if ($submitBtn) {
+        $submitBtn.disabled = false;
+        $submitBtn.textContent = "Skicka";
+      }
+    }
+  };
 
   // ── Helpers ────────────────────────────────────────────
 

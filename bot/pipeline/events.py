@@ -25,6 +25,9 @@ class EventType(str, Enum):
     IMAGE_GENERATED = "image_generated"
     VARIANT_SCORED = "variant_scored"
 
+    # Refinement
+    IMAGE_REFINED = "image_refined"
+
     # Progress
     PROGRESS = "progress"
 

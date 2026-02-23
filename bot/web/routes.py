@@ -11,9 +11,11 @@ from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 
 from bot.config import DEFAULT_PRODUCT_IMAGE, REFERENCE_DIR
+from bot.pipeline.events import Event, EventType, event_bus
 from bot.pipeline.models import PipelineRequest
 from bot.pipeline.orchestrator import run_pipeline
 from bot.storage.jobs import job_store
+from bot.pipeline.agents.generator import run_refine
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +124,16 @@ async def get_job(job_id: str) -> JSONResponse:
         ],
         "images": images,
         "evaluations": evaluations,
+        "refinements": [
+            {
+                "variant": r.variant,
+                "instruction": r.instruction,
+                "original_path": r.original_path.split("/outputs/")[-1] if "/outputs/" in r.original_path else r.original_path,
+                "refined_path": r.refined_path.split("/outputs/")[-1] if "/outputs/" in r.refined_path else r.refined_path,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in job.refinements
+        ],
         "summary": job.evaluation.summary if job.evaluation else None,
         "winner": job.evaluation.winner.value if job.evaluation and job.evaluation.winner else None,
         "error": job.error,
@@ -162,3 +174,86 @@ async def generate(
     asyncio.create_task(run_pipeline(request))
 
     return JSONResponse({"job_id": request.job_id}, status_code=202)
+
+
+@router.post("/refine")
+async def refine(
+    job_id: str = Form(...),
+    variant: str = Form(...),
+    instruction: str = Form(""),
+) -> JSONResponse:
+    """Refine a single variant image. Old image is preserved."""
+
+    job = job_store.get(job_id)
+    if not job:
+        return JSONResponse({"error": "Job not found"}, status_code=404)
+
+    # Find the original image for this variant
+    original_img = None
+    for img in job.images:
+        if img.variant_type.value == variant and img.success and img.file_path:
+            original_img = img
+            break
+
+    if not original_img:
+        return JSONResponse({"error": "Variant image not found"}, status_code=404)
+
+    # Find the original prompt for this variant
+    original_prompt = job.request.user_prompt
+    for p in job.prompts:
+        if p.variant_type.value == variant:
+            original_prompt = p.narrative_prompt
+            break
+
+    # Run refinement in background
+    async def _do_refine():
+        try:
+            await event_bus.emit(Event(
+                type=EventType.PROGRESS,
+                job_id=job_id,
+                data={"agent": "generator", "message": f"Refining {variant}..."},
+            ))
+
+            refinement = await run_refine(
+                job_id=job_id,
+                variant=variant,
+                original_image_path=original_img.file_path,
+                original_prompt=original_prompt,
+                instruction=instruction,
+                aspect_ratio=job.request.aspect_ratio,
+                resolution=job.request.resolution,
+                reference_image_paths=job.request.reference_image_paths,
+            )
+
+            # Persist refinement to job
+            job_fresh = job_store.get(job_id)
+            if job_fresh:
+                job_fresh.refinements.append(refinement)
+                job_store.update_result(job_fresh)
+
+            refined_rel = refinement.refined_path
+            if "/outputs/" in refined_rel:
+                refined_rel = refined_rel.split("/outputs/")[-1]
+
+            await event_bus.emit(Event(
+                type=EventType.IMAGE_REFINED,
+                job_id=job_id,
+                data={
+                    "variant": variant,
+                    "instruction": instruction,
+                    "refined_path": refined_rel,
+                    "original_path": original_img.file_path.split("/outputs/")[-1] if "/outputs/" in original_img.file_path else original_img.file_path,
+                },
+            ))
+
+        except Exception as e:
+            logger.exception("Refinement failed for %s/%s", job_id, variant)
+            await event_bus.emit(Event(
+                type=EventType.JOB_FAILED,
+                job_id=job_id,
+                data={"error": f"Refinement failed: {e}"},
+            ))
+
+    asyncio.create_task(_do_refine())
+
+    return JSONResponse({"status": "refining", "job_id": job_id, "variant": variant}, status_code=202)

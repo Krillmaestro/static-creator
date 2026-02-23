@@ -101,6 +101,16 @@ class CriticResult(BaseModel):
     winner: Optional[VariantType] = None
 
 
+# ── Refinement ────────────────────────────────────────────────────
+
+class Refinement(BaseModel):
+    variant: str
+    instruction: str = ""
+    original_path: str = ""
+    refined_path: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 # ── Pipeline Result ────────────────────────────────────────────────
 
 class PipelineResult(BaseModel):
@@ -110,6 +120,7 @@ class PipelineResult(BaseModel):
     prompts: list[PromptVariant] = Field(default_factory=list)
     images: list[GeneratedImage] = Field(default_factory=list)
     evaluation: Optional[CriticResult] = None
+    refinements: list[Refinement] = Field(default_factory=list)
     stage: PipelineStage = PipelineStage.QUEUED
     error: Optional[str] = None
     started_at: Optional[datetime] = None

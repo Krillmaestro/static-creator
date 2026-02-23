@@ -574,6 +574,139 @@ header .status-dot.disconnected { background: var(--red); }
   color: var(--forest);
 }
 
+/* ── Refine UI ─────────────────────────────────── */
+
+.variant-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  align-items: center;
+}
+
+.btn-refine {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  background: var(--white);
+  color: var(--amber);
+  border: 1px solid var(--amber);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-refine:hover {
+  background: var(--amber);
+  color: var(--white);
+}
+
+.refine-form {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--gray-100);
+  border-radius: 8px;
+}
+
+.refine-input {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  background: var(--white);
+  color: var(--bark);
+}
+
+.refine-input:focus {
+  outline: none;
+  border-color: var(--forest);
+}
+
+.refine-form-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.btn-refine-submit {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  background: var(--forest);
+  color: var(--cream);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-refine-submit:hover {
+  background: var(--main-green);
+}
+
+.btn-refine-submit:disabled {
+  background: var(--gray-400);
+  cursor: not-allowed;
+}
+
+.btn-refine-cancel {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  background: var(--white);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-refine-cancel:hover {
+  background: var(--gray-100);
+}
+
+.refinement-list {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--gray-200);
+  padding-top: 0.4rem;
+}
+
+.refinement-row {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--gray-100);
+  align-items: flex-start;
+}
+
+.refinement-row img {
+  width: 64px;
+  height: 64px;
+  border-radius: 4px;
+  object-fit: cover;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.refinement-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  min-width: 0;
+}
+
+.refinement-instruction {
+  color: var(--bark);
+  font-style: italic;
+}
+
+.refinement-time {
+  color: var(--gray-400);
+  font-size: 0.7rem;
+}
+
 /* ── Empty states ───────────────────────────────── */
 
 .empty-state {
